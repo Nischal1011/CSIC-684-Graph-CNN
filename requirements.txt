@@ -1,0 +1,10 @@
+torch-geometric
+torch
+torch
+scipy
+jupyter
+scikit-learn
+matplotlib
+pandas
+networkx
+python-louvain
