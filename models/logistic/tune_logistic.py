@@ -2,7 +2,7 @@ import torch
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
-from utils import create_proportional_train_mask
+from utils.data_split_utils import create_proportional_train_mask
 
 if __name__ == "__main__":
     print("--- Tuning Logistic Regression ---")

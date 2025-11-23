@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 from sklearn.metrics import f1_score, classification_report
 from sklearn.model_selection import train_test_split
-from utils import create_proportional_train_mask
+from utils.data_split_utils import create_proportional_train_mask
 
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import to_networkx

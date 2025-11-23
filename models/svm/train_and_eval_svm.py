@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import f1_score, classification_report
-from utils import create_proportional_train_mask
+from utils.data_split_utils import create_proportional_train_mask
 
 
 if __name__ == "__main__":
