@@ -34,3 +34,4 @@ if __name__ == "__main__":
     print(f"Best cross-validation Macro F1: {grid_search.best_score_:.4f}")
     print(f"Best Parameters: {grid_search.best_params_}")
     print("Use these parameters in logistic.py")
+
