@@ -6,6 +6,8 @@ import numpy as np
 from sklearn.metrics import f1_score, classification_report
 from utils.data_split_utils import create_proportional_train_mask
 
+RANDOM_EMBEDDING = 0
+
 # --- GCN Model Definition ---
 class GCN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, dropout_rate):
@@ -26,7 +28,6 @@ def train(model, data, optimizer, loss_fn):
     model.train()
     optimizer.zero_grad()
     out = model(data.x, data.edge_index)
-    # UPDATE: We now use the full 'train_mask' (the 10%, 50%, etc.) for training
     loss = loss_fn(out[data.train_mask], data.y[data.train_mask])
     loss.backward()
     optimizer.step()
@@ -41,25 +42,33 @@ def evaluate(model, data, mask):
     return score, pred, target
 
 if __name__ == "__main__":
-    # UPDATED: Using the best parameters found in from tuning script
     TUNED_PARAMS = {
         'hidden_channels': 64,    
         'dropout_rate': 0.5,      
         'learning_rate': 0.01,    
-        'weight_decay': 0          # Tuned value
+        'weight_decay': 0          
     }
     
     LABEL_RATES = [0.1, 0.5, 1.0]
     SEEDS = [0, 42, 123]
     EPOCHS = 200
-    EARLY_STOPPING_PATIENCE = 20   # Increased slightly for better convergence
+    EARLY_STOPPING_PATIENCE = 20   
     
     # Load Data
     data_with_holdout = torch.load('data/data_with_split.pt', weights_only=False)
     
-    # Keep Normalization with weight_decay=0
-    transform = T.NormalizeFeatures() 
-    data_with_holdout = transform(data_with_holdout)
+    if RANDOM_EMBEDDING:
+        print("Overwriting original features with Gaussian noise.")
+        
+        num_nodes, num_features = data_with_holdout.x.shape
+        generator = torch.Generator()
+        generator.manual_seed(999) 
+        data_with_holdout.x = torch.randn(num_nodes, num_features, generator=generator)
+    else:
+        # Only normalize if we are using the real features
+        # Random noise is already effectively normalized (mean 0, std 1)
+        transform = T.NormalizeFeatures() 
+        data_with_holdout = transform(data_with_holdout)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -73,34 +82,19 @@ if __name__ == "__main__":
         for seed in SEEDS:
             print(f"--- Seed: {seed} ---")
             
-            # 1. Create the specific Training Mask (e.g., 10%)
             data_for_run = create_proportional_train_mask(data_with_holdout.clone(), rate, seed)
             
-            # 2. STABLE VALIDATION STRATEGY
-            # Instead of splitting the tiny training set, we use all nodes 
-            # that are NOT in Train and NOT in Test as the Validation set.
-            # This guarantees a large, stable validation set (~5000 nodes) for Early Stopping.
-            
-            # Get all indices
             all_indices = torch.arange(data_for_run.num_nodes)
-            
-            # Identify validation nodes (Everything that is not Train and not Test)
-            # Note: 'test_mask' is the fixed holdout set from data_with_split.pt
             combined_mask = data_for_run.train_mask | data_for_run.test_mask
-            
-            # Create val_mask
             data_for_run.val_mask = ~combined_mask
             
             data_for_run = data_for_run.to(device)
 
-            # --- Class Weights ---
-            # Calculate weights based on the actual training nodes available
             train_labels = data_for_run.y[data_for_run.train_mask]
             class_counts = torch.bincount(train_labels)
             class_weights = 1. / class_counts.float()
             class_weights = class_weights.to(device)
 
-            # Initialize Model
             model = GCN(data_for_run.num_features, 
                         TUNED_PARAMS['hidden_channels'], 
                         10, 
@@ -112,14 +106,11 @@ if __name__ == "__main__":
             
             loss_fn = torch.nn.NLLLoss(weight=class_weights)
 
-            # Training Loop with Early Stopping
             best_val_f1 = 0
             patience = 0
             
             for epoch in range(1, EPOCHS + 1):
                 train(model, data_for_run, optimizer, loss_fn)
-                
-                # Evaluate on the large, stable validation set
                 val_f1, _, _ = evaluate(model, data_for_run, data_for_run.val_mask)
                 
                 if val_f1 > best_val_f1:
@@ -132,7 +123,6 @@ if __name__ == "__main__":
                 if patience >= EARLY_STOPPING_PATIENCE: 
                     break
             
-            # Load best model and test
             model.load_state_dict(torch.load('best_gcn_model.pth', weights_only=True))
             test_f1, preds, y_test = evaluate(model, data_for_run, data_for_run.test_mask)
             f1_scores_for_rate.append(test_f1)
@@ -147,7 +137,12 @@ if __name__ == "__main__":
             'std_f1': np.std(f1_scores_for_rate)
         }
 
-    print(f"\n\n{'='*60}\nFinal Aggregated Results for Tuned Vanilla GCN\n{'='*60}")
+    print(f"\n\n{'='*60}\nFinal Aggregated Results for GCN")
+    if RANDOM_EMBEDDING:
+        print("(Running with RANDOM EMBEDDINGS)")
+    else:
+        print("(Running with ORIGINAL FEATURES)")
+    print(f"{'='*60}")
     for rate_key, result in results.items():
         print(f"\n--- {rate_key} ---")
         print(f"  Mean Macro-F1: {result['mean_f1']:.4f}")

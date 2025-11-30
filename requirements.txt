@@ -8,3 +8,4 @@ matplotlib
 pandas
 networkx
 python-louvain
+seaborn
