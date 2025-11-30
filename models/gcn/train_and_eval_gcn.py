@@ -41,13 +41,12 @@ def evaluate(model, data, mask):
     return score, pred, target
 
 if __name__ == "__main__":
-    # --- Configuration ---
-    # UPDATED: Using the best parameters found in your tuning
+    # UPDATED: Using the best parameters found in from tuning script
     TUNED_PARAMS = {
         'hidden_channels': 64,    
         'dropout_rate': 0.5,      
         'learning_rate': 0.01,    
-        'weight_decay': 0          # Tuned value (works well with NormalizeFeatures)
+        'weight_decay': 0          # Tuned value
     }
     
     LABEL_RATES = [0.1, 0.5, 1.0]
@@ -58,7 +57,7 @@ if __name__ == "__main__":
     # Load Data
     data_with_holdout = torch.load('data/data_with_split.pt', weights_only=False)
     
-    # CRITICAL: Keep Normalization with weight_decay=0
+    # Keep Normalization with weight_decay=0
     transform = T.NormalizeFeatures() 
     data_with_holdout = transform(data_with_holdout)
     

@@ -6,21 +6,39 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import f1_score, classification_report
 from utils.data_split_utils import create_proportional_train_mask
 
+RANDOM_EMBEDDING = 0  # Set to 1 to replace features with random noise (Hypothesis 2), 0 for normal features
+
 
 if __name__ == "__main__":
     TUNED_PARAMS = {
-        'C': 0.01, # this would should be replaced by the tuned value after performing the hyperparameter search
+        'C': 0.01, 
         'max_iter': 1000,
         'random_state': 42,
-        'class_weight': 'balanced' # we are using balanced class weights to handle class imbalance
+        'class_weight': 'balanced' 
     }
 
-    LABEL_RATES = [0.1, 0.5, 1.0] # 10%, 50%, 100%
+    LABEL_RATES = [0.1, 0.5, 1.0] 
     SEEDS = [0, 42, 123]
 
     # Load the data file with the 80/20 split
     data_with_holdout = torch.load('data/data_with_split.pt', weights_only=False)
     
+    if RANDOM_EMBEDDING:
+        print("Overwriting original features with Gaussian noise.")
+        
+        # Get dimensions of the original data
+        num_nodes, num_features = data_with_holdout.x.shape
+        
+        # Generate random noise (Standard Normal Distribution)
+        # We set a fixed generator seed here to ensure the 'randomness' is consistent across runs
+        # if you want to reproduce the specific noise pattern.
+        generator = torch.Generator()
+        generator.manual_seed(999) 
+        
+        # Replace features
+        data_with_holdout.x = torch.randn(num_nodes, num_features, generator=generator)
+    # ----------------------------------------------------
+
     # Store all results
     results = {}
 
@@ -60,7 +78,7 @@ if __name__ == "__main__":
             
             print(f"Test Macro-F1: {macro_f1:.4f}")
             
-            # Print classification report for the first seed only to check the each class performance 
+            # Print classification report for the first seed only
             if seed == SEEDS[0]:
                 print("\n Classification Report (Seed 0)")
                 print(classification_report(y_test, preds, zero_division=0))
@@ -71,7 +89,13 @@ if __name__ == "__main__":
             'std_f1': np.std(f1_scores_for_rate)
         }
 
-    print(f"\n\n{'='*60}\nFinal Aggregated Results for Logistic Regression\n{'='*60}")
+    print(f"\n\n{'='*60}\nFinal Aggregated Results for Logistic Regression\n")
+    if RANDOM_EMBEDDING:
+        print("(Running with RANDOM EMBEDDINGS)")
+    else:
+        print("(Running with ORIGINAL FEATURES)")
+    print(f"{'='*60}")
+    
     for rate_key, result in results.items():
         print(f"\n--- {rate_key} ---")
         print(f"  Mean Macro-F1: {result['mean_f1']:.4f}")

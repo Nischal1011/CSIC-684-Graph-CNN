@@ -1,3 +1,4 @@
+# svm.py
 import torch
 import numpy as np
 from sklearn.svm import SVC
@@ -6,12 +7,15 @@ from sklearn.metrics import f1_score, classification_report
 from utils.data_split_utils import create_proportional_train_mask
 
 
+RANDOM_EMBEDDING = 1  # Set to 1 to replace features with random noise (Hypothesis 2), 0 for normal features
+
+
 if __name__ == "__main__":
     TUNED_PARAMS = {
-        'C': 0.001, # <-- UPDATE THIS TUNING SCRIPT
-        'kernel': 'linear', # Using a linear kernel is standard for high-dimensional text data
+        'C': 0.001, 
+        'kernel': 'linear', 
         'random_state': 42,
-        'class_weight': 'balanced' # we are using balanced class weights to handle class imbalance
+        'class_weight': 'balanced' 
     }
 
     LABEL_RATES = [0.1, 0.5, 1.0] # 10%, 50%, 100%
@@ -20,6 +24,22 @@ if __name__ == "__main__":
     # Load the data file with the 80/20 split
     data_with_holdout = torch.load('data/data_with_split.pt', weights_only=False)
     
+    # --- HYPOTHESIS 2 MODIFICATION: RANDOM EMBEDDINGS ---
+    if RANDOM_EMBEDDING:
+        print("Overwriting original features with Gaussian noise.")
+        
+        # Get dimensions of the original data
+        num_nodes, num_features = data_with_holdout.x.shape
+        
+        # Generate random noise (Standard Normal Distribution)
+        # Using fixed seed for reproducibility of the noise pattern itself
+        generator = torch.Generator()
+        generator.manual_seed(999) 
+        
+        # Replace features
+        data_with_holdout.x = torch.randn(num_nodes, num_features, generator=generator)
+    # ----------------------------------------------------
+
     # Store all results
     results = {}
 
@@ -71,7 +91,13 @@ if __name__ == "__main__":
         }
 
     # --- Final Summary ---
-    print(f"\n\n{'='*60}\nFinal Aggregated Results for SVM\n{'='*60}")
+    print(f"\n\n{'='*60}\nFinal Aggregated Results for SVM")
+    if RANDOM_EMBEDDING:
+        print("(Running with RANDOM EMBEDDINGS)")
+    else:
+        print("(Running with ORIGINAL FEATURES)")
+    print(f"{'='*60}")
+
     for rate_key, result in results.items():
         print(f"\n--- {rate_key} ---")
         print(f"  Mean Macro-F1: {result['mean_f1']:.4f}")
