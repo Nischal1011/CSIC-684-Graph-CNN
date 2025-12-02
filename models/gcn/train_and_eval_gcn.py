@@ -3,8 +3,11 @@ import torch.nn.functional as F
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv
 import numpy as np
-from sklearn.metrics import f1_score, classification_report
+from sklearn.metrics import f1_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 from utils.data_split_utils import create_proportional_train_mask
+from collections import defaultdict
+from tabulate import tabulate
 
 # --- GCN Model Definition ---
 class GCN(torch.nn.Module):
@@ -71,6 +74,9 @@ if __name__ == "__main__":
         print(f"\n{'='*60}\nRunning experiment with Label Rate: {rate_key}\n{'='*60}")
         
         f1_scores_for_rate = []
+        reports_for_rate = []
+
+        conf_matrices = []
         for seed in SEEDS:
             print(f"--- Seed: {seed} ---")
             
@@ -139,13 +145,50 @@ if __name__ == "__main__":
             f1_scores_for_rate.append(test_f1)
             print(f"  > Test Macro-F1: {test_f1:.4f}")
 
+            # Save report for aggregation
+            report = classification_report(
+                y_test, preds, zero_division=0, output_dict=True
+            )
+            reports_for_rate.append(report)
+
+            """
             if seed == SEEDS[0]:
-                print("\n--- Classification Report (Seed 0) ---")
+                print(f"\n--- Classification Report {seed} ---")
                 print(classification_report(y_test.cpu(), preds.cpu(), zero_division=0))
+            """
+            
+            # Store confusion matrix for this seed
+            cm = confusion_matrix(y_test, preds)
+            conf_matrices.append(cm)
+        
+        # Aggregated class metrics 
+        aggregated_class_metrics = defaultdict(lambda: defaultdict(list))
+        accuracy_list = []
+
+        # report_for_rate contains the 3 classification reports, one for each seed
+        # Iterate through each reports, we'll append the value of each metrics to a list in the hashmap as correponding to their class
+        #   - This list would contain all values across each seed number (i.e. "precision": [0.5, 0.43, 0.2])
+        #   - Used later for ease of computing the average values across the seed number
+        for rep in reports_for_rate:
+            for label, metrics in rep.items():
+
+                # Case 1: accuracy (float)
+                if label == "accuracy":
+                    accuracy_list.append(metrics)
+                    continue
+
+                # Case 2: per-class metrics (dict)
+                if isinstance(metrics, dict):
+                    for metric_name, val in metrics.items():
+                        if metric_name in ["precision", "recall", "f1-score", "support"]:
+                            aggregated_class_metrics[label][metric_name].append(val)
         
         results[rate_key] = {
             'mean_f1': np.mean(f1_scores_for_rate),
-            'std_f1': np.std(f1_scores_for_rate)
+            'std_f1': np.std(f1_scores_for_rate),
+            "aggregated_class_metrics": aggregated_class_metrics,
+            "accuracy": np.mean(accuracy_list),
+            "conf_matrices": conf_matrices
         }
 
     print(f"\n\n{'='*60}\nFinal Aggregated Results for Tuned Vanilla GCN\n{'='*60}")
@@ -153,3 +196,31 @@ if __name__ == "__main__":
         print(f"\n--- {rate_key} ---")
         print(f"  Mean Macro-F1: {result['mean_f1']:.4f}")
         print(f"  Std Dev (stability): {result['std_f1']:.4f}")
+        print(f"  Accuarcy: {result['accuracy']:.4f}")
+
+        # Average confusion matrix for this label rate
+        cms = result["conf_matrices"]
+        avg_cm = np.mean(np.stack(cms), axis=0)
+
+        # Confusion matrix 
+        plt.figure(figsize=(8, 6))
+        disp = ConfusionMatrixDisplay(confusion_matrix=avg_cm)
+        disp.plot(cmap="Blues", values_format=".2f", colorbar=True)
+        plt.title(f"GCN: Averaged Confusion Matrix — {rate_key}")
+        plt.show()
+
+        # Class metrics table
+        class_metrics = result["aggregated_class_metrics"]
+
+        table = []
+        headers = ["Class", "Precision", "Recall", "F1-score", "Support"]
+
+        for cls in sorted(class_metrics.keys(), key=str):
+            prec = np.mean(class_metrics[cls]["precision"])
+            rec = np.mean(class_metrics[cls]["recall"])
+            f1 = np.mean(class_metrics[cls]["f1-score"])
+            sup = int(np.mean(class_metrics[cls]["support"]))
+
+            table.append([cls, f"{prec:.4f}", f"{rec:.4f}", f"{f1:.4f}", sup])
+
+        print(tabulate(table, headers=headers, tablefmt="github"))
