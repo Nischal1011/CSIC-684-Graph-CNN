@@ -1,3 +1,10 @@
+"""
+Fragility analysis
+
+Compare per-class performance (F1) between a baseline (e.g. logistic regression)
+and GCN to identify classes that benefit or suffer from graph-based learning.
+"""
+
 import torch
 import numpy as np
 import pandas as pd

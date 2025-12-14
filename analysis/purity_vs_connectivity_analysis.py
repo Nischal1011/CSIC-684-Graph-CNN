@@ -1,3 +1,10 @@
+"""
+Purity and Connectivity Analysis
+
+Measure neighborhood purity (homophily) and structural confusion
+between classes.
+"""
+
 import torch
 import numpy as np
 import pandas as pd
