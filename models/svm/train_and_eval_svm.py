@@ -9,7 +9,7 @@ from utils.data_split_utils import create_proportional_train_mask
 from collections import defaultdict
 from tabulate import tabulate
 
-RANDOM_EMBEDDING = 1  # Set to 1 to replace features with random noise (Hypothesis 2), 0 for normal features
+RANDOM_EMBEDDING = 0  # Set to 1 to replace features with random noise (Hypothesis 2), 0 for normal features
 
 
 if __name__ == "__main__":

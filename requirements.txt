@@ -9,3 +9,4 @@ pandas
 networkx
 python-louvain
 seaborn
+tabulate

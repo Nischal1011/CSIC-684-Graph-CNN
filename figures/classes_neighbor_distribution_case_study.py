@@ -1,103 +1,63 @@
 import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.patches import Patch
+import seaborn as sns
+import pandas as pd
+import os
 
-# --------------------------------
-# Data for the three low-homophily classes
-# --------------------------------
-class_data = {
-    'Class 6': {
-        'self': 51.1,
-        'foreign': 40.0,
-        'foreign_label': 'Class 8',
-        'homophily': 0.511
-    },
-    'Class 1': {
-        'self': 60.4,
-        'foreign': 29.0,
-        'foreign_label': 'Class 4',
-        'homophily': 0.604
-    },
-    'Class 3': {
-        'self': 50.9,
-        'foreign': 24.3,
-        'foreign_label': 'Class 4',
-        'homophily': 0.509
-    }
-}
+# 1. SETUP DATA (Updated with SPECIFIC Foreign Neighbor Names)
+# I included the specific neighbor name in the 'Class' column so it shows up on the X-axis
+data = pd.DataFrame({
+    'Class': [
+        'Class 6\n(Foreign: Class 8)', 'Class 6\n(Foreign: Class 8)', 
+        'Class 1\n(Foreign: Class 4)', 'Class 1\n(Foreign: Class 4)', 
+        'Class 3\n(Foreign: Class 4)', 'Class 3\n(Foreign: Class 4)'
+    ],
+    'Type': [
+        'Self-class', 'Top foreign neighbor', 
+        'Self-class', 'Top foreign neighbor', 
+        'Self-class', 'Top foreign neighbor'
+    ],
+    'Value': [51.1, 40.0, 60.4, 29.0, 50.9, 24.3]
+})
 
-# --------------------------------
-# Figure setup
-# --------------------------------
-fig, axes = plt.subplots(1, 3, figsize=(15, 6))
-bar_width = 0.6
+# 2. SET THEME
+sns.set_theme(style="white", context="poster", rc={
+    "axes.spines.right": False,
+    "axes.spines.top": False,
+    "axes.linewidth": 3,
+    "patch.linewidth": 3,
+    "font.weight": "bold",
+    "axes.labelweight": "bold"
+})
 
-for idx, (class_name, data) in enumerate(class_data.items()):
-    ax = axes[idx]
-    
-    # Bars
-    categories = [f'{class_name}\n(Self)', f'{data["foreign_label"]}\n(Foreign)']
-    values = [data['self'], data['foreign']]
-    colors = ['#2ecc71', '#e74c3c']
-    
-    bars = ax.bar(categories, values, width=bar_width,
-                  color=colors, edgecolor='black', linewidth=2)
+# 3. CREATE PLOT
+fig, ax = plt.subplots(figsize=(12, 7))
 
-    # Value labels
-    for bar, val in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width()/2., val + 1.2,
-                f'{val:.1f}%', ha='center', va='bottom',
-                fontsize=14, fontweight='bold')
-
-    # Axes styling
-    ax.set_ylim(0, 70)
-    ax.set_ylabel('% of Neighbors', fontsize=11, fontweight='bold')
-    ax.set_title(f'{class_name} Neighbor Distribution', fontsize=13, fontweight='bold')
-    ax.yaxis.grid(True, linestyle='--', alpha=0.5)
-    ax.set_axisbelow(True)
-
-    # Homophily annotation
-    ax.text(0.5, 0.92, f'Homophily: {data["homophily"]:.1%}',
-            transform=ax.transAxes, ha='center',
-            fontsize=11, fontstyle='italic',
-            bbox=dict(boxstyle='round,pad=0.3',
-                      facecolor='lightyellow', alpha=0.8))
-
-    # Highlight Class 6 with extra annotation
-    if class_name == 'Class 6':
-        ax.text(0.5, 63.5,
-                "Near 50–50 split\nGCN gets mixed signals",
-                ha='center', va='bottom',
-                fontsize=10, fontweight='bold', color='darkred',
-                bbox=dict(boxstyle='round,pad=0.4',
-                          facecolor='white', edgecolor='darkred', linewidth=1.2))
-
-# --------------------------------
-# Legend inside figure
-# --------------------------------
-legend_elements = [
-    Patch(facecolor='#2ecc71', edgecolor='black', label='Self-class (correct signal)'),
-    Patch(facecolor='#e74c3c', edgecolor='black', label='Top foreign neighbor (noise)')
-]
-fig.legend(handles=legend_elements, loc='upper center', ncol=2,
-           fontsize=11, bbox_to_anchor=(0.5, 0.07), frameon=True)
-
-# --------------------------------
-# Main title
-# --------------------------------
-fig.suptitle(
-    'Neighbor Distribution for Low-Homophily Classes\n'
-    '(Dominant foreign neighbors introduce confusion for GCN)',
-    fontsize=15, fontweight='bold', y=0.98
+sns.barplot(
+    data=data, 
+    x='Class', 
+    y='Value', 
+    hue='Type', 
+    palette=['#2ecc71', '#e74c3c'], 
+    edgecolor='black',
+    width=0.6,
+    ax=ax
 )
 
-# --------------------------------
-# Adjust spacing
-# --------------------------------
-plt.subplots_adjust(top=0.88, bottom=0.17, wspace=0.25)
+# 4. ADD LABELS ON BARS
+for container in ax.containers:
+    # Padding=4 keeps it tighter to the bar
+    ax.bar_label(container, fmt='%.1f%%', padding=4, fontweight='bold', fontsize=24)
 
-# --------------------------------
-# Save + show
-# --------------------------------
-plt.savefig('figure4_neighbor_distribution_clean.png', dpi=300, bbox_inches='tight')
+# 5. ADJUSTMENTS (Fixed the "Zooming too much")
+# Reduced ylim from 90 -> 75. This makes the bars fill the chart better.
+ax.set_ylim(0, 75) 
+ax.set_xlabel("")
+ax.set_ylabel("% of neighbors", fontsize=24, fontweight='bold')
+
+# Legend: Moved inside to save space, but kept clean
+ax.legend(loc='upper right', frameon=True, framealpha=1, edgecolor='black', fontsize=18)
+
+plt.tight_layout()
+os.makedirs("figures", exist_ok=True)
+plt.savefig("figures/bar_chart_seaborn_fixed_zoom_labels.png", dpi=300)
 plt.show()
